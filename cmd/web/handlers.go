@@ -12,7 +12,7 @@ import (
 func home(app *config.Application) http.HandlerFunc  {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
-			http.NotFound(w, r)
+			app.NotFound(w)
 			return
 		}
 		files := []string{
@@ -24,19 +24,19 @@ func home(app *config.Application) http.HandlerFunc  {
 		ts, err := template.ParseFiles(files...)
 		if err != nil {
 			app.ErrLog.Println(err.Error())
-			http.Error(w, "Internal Server Error", 500)
+			app.ServerError(w, err)
 			return
 		}
 		if ts == nil {
 			app.InfoLog.Println("Ошибка рендеринга home.page")
-			http.Error(w, "Internal Server Error", 500)
+			app.ServerError(w, err)
 			return
 		}
 
 		err = ts.Execute(w, nil)
 		if err != nil {
 			app.ErrLog.Println(err.Error())
-			http.Error(w, "Internal Server Error", 500)
+			app.ServerError(w, err)
 		}
 	}
 }
@@ -47,7 +47,7 @@ func showSnippet(app *config.Application) http.HandlerFunc {
 		id, err := strconv.Atoi(r.URL.Query().Get("id"))
 		if err != nil || id < 1 {
 			app.ErrLog.Printf("error while getting id")
-			http.NotFound(w, r)
+			app.NotFound(w)
 			return
 		}
 		_, err = fmt.Fprintf(w, "Отображение заметки № %d", id)
@@ -63,7 +63,7 @@ func createSnippet(app *config.Application) http.HandlerFunc {
 		if r.Method != http.MethodPost {
 			app.InfoLog.Println("ET-method запрещен")
 			w.Header().Set("Allow", http.MethodPost)
-			http.Error(w, "GET-method запрещен", 405)
+			app.ClientError(w, http.StatusMethodNotAllowed)
 			return
 		}
 		_, err := w.Write([]byte("Форма для создания новой заметки..."))
