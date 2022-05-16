@@ -2,8 +2,10 @@ package main
 
 import (
 	"flag"
+	"golangify.com/snippetbox/config"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 )
 
@@ -16,17 +18,31 @@ func main()  {
 	addr := flag.String("addr", ":4000", "Сетевой адрес HTTP")
 	flag.Parse()
 
+	// go run ./cmd/web >>/tmp/info.log 2>>/tmp/error.log - перенаправление потока в файлы
+	infoLog := log.New(os.Stdout, "INFO\t", log.LstdFlags)
+	errLog := log.New(os.Stderr, "ERROR\t", log.LstdFlags|log.Lshortfile)
+
+	app := &config.Application{
+		ErrLog: errLog,
+		InfoLog:  infoLog,
+	}
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", home)
-	mux.HandleFunc("/snippet", showSnippet)
-	mux.HandleFunc("/snippet/create", createSnippet)
+	mux.HandleFunc("/", home(app))
+	mux.HandleFunc("/snippet", showSnippet(app))
+	mux.HandleFunc("/snippet/create", createSnippet(app))
 
 	fileServer := http.FileServer(neuteredFileSystem{http.Dir("./ui/static")})
 	mux.Handle("/static/", http.StripPrefix("/static", fileServer))
 
-	log.Printf("Запуск веб-сервера на %s", *addr)
-	err := http.ListenAndServe(*addr, mux)
-	log.Fatal(err)
+	srv := &http.Server{
+		Addr:     *addr,
+		ErrorLog: errLog,
+		Handler:  mux,
+	}
+	infoLog.Printf("Запуск веб-сервера на %s", *addr)
+	err := srv.ListenAndServe()
+	errLog.Fatal(err)
 }
 
 func (nfs neuteredFileSystem) Open(path string) (http.File, error) {
